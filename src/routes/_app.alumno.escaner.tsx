@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { PaperButton, PaperCard, PaperTape } from "@/components/paper/Paper";
 import { canjearQr, registrarEntregaManual, useStore } from "@/lib/store";
+import { SmartQrModal } from "@/components/scanner/SmartQrModal";
 import {
   ShieldCheck,
   Scale,
@@ -12,6 +13,8 @@ import {
   History,
   Lock,
   Sparkles,
+  Search,
+  Check,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/alumno/escaner")({
@@ -40,6 +43,10 @@ function EscanerPage() {
   );
   const [manualPeso, setManualPeso] = useState("2.5");
 
+  // Estado para la ventana flotante de investigación IA de QR
+  const [investigatingCode, setInvestigatingCode] = useState<string | null>(null);
+  const [customQrInput, setCustomQrInput] = useState("");
+
   const misEntregas = entregas.filter((e) => e.alumnoId === user?.id);
 
   const stopCamera = useCallback(() => {
@@ -51,21 +58,31 @@ function EscanerPage() {
     setCameraOn(false);
   }, []);
 
-  /** Procesa un QR detectado: valida, suma puntos y reactiva el escáner. */
+  /** Procesa un QR detectado: abre la investigación inteligente y opcionalmente canjea puntos si aplica. */
   const handleCode = useCallback(async (raw: string) => {
     busyRef.current = true;
-    const res = await canjearQr(raw);
-    if (res.ok) {
-      setFeedback({
-        tipo: "ok",
-        titulo: "¡Entrega Verificada!",
-        detalle: `Sumaste ${res.puntos} puntos (${res.material}).`,
-        hash: res.hash,
-      });
-    } else {
-      setFeedback({ tipo: "error", titulo: "Código no válido", detalle: res.error });
+
+    // Abre inmediatamente la ventana flotante con el análisis inteligente
+    setInvestigatingCode(raw);
+
+    // Si es un código de reciclaje válido de Karmaverde, lo procesa también
+    if (
+      raw.startsWith("KV|") ||
+      raw.includes("pet-") ||
+      raw.includes("carton-") ||
+      raw.includes("aluminio-")
+    ) {
+      const res = await canjearQr(raw);
+      if (res.ok) {
+        setFeedback({
+          tipo: "ok",
+          titulo: "¡Entrega Verificada!",
+          detalle: `Sumaste ${res.puntos} puntos (${res.material}).`,
+          hash: res.hash,
+        });
+      }
     }
-    // Reactivar el escáner tras mostrar el resultado
+
     setTimeout(() => {
       busyRef.current = false;
     }, 2800);
@@ -149,12 +166,25 @@ function EscanerPage() {
     });
   };
 
+  const handleCustomInvestigate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customQrInput.trim()) return;
+    setInvestigatingCode(customQrInput.trim());
+    setCustomQrInput("");
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="display text-3xl text-ink">Escáner de Depósito y Pesaje</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="display text-3xl text-ink">Escáner e Investigador Inteligente</h1>
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-black text-primary uppercase">
+            <Sparkles className="h-3.5 w-3.5" /> IA Activa
+          </span>
+        </div>
         <p className="text-sm text-muted-foreground">
-          Escaneá el código QR del contenedor inteligente o registrá tu entrega en balanza.
+          Escaneá cualquier código QR, URL o contenedor: el sistema detecta de qué sitio proviene,
+          su composición e impacto ecológico.
         </p>
       </div>
 
@@ -162,8 +192,8 @@ function EscanerPage() {
       <div className="flex items-center gap-2 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-xs text-primary font-bold">
         <Lock className="h-4 w-4 shrink-0" />
         <span>
-          <strong>Protección Criptográfica:</strong> Cada depósito genera un token único con firma
-          de un solo uso para evitar duplicados.
+          <strong>Detección y Protección Criptográfica:</strong> Análisis de procedencia en tiempo
+          real con token de seguridad para depósitos escolares.
         </span>
       </div>
 
@@ -197,9 +227,10 @@ function EscanerPage() {
                 <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-cream/15 text-sun">
                   <QrCode className="h-9 w-9 stroke-[2.2]" />
                 </div>
-                <p className="text-sm font-extrabold">Cámara apagada</p>
+                <p className="text-sm font-extrabold">Cámara lista para escanear</p>
                 <p className="text-xs text-cream/70">
-                  Activá la cámara para escanear el punto verde o usá los QRs de prueba abajo.
+                  Activá la cámara para enfocar cualquier QR o probá los botones de investigación
+                  rápida abajo.
                 </p>
               </div>
             </div>
@@ -238,6 +269,23 @@ function EscanerPage() {
           </button>
         </div>
 
+        {/* Barra para investigar cualquier texto o URL manualmente */}
+        <form onSubmit={handleCustomInvestigate} className="flex gap-2 max-w-sm mx-auto pt-2">
+          <input
+            type="text"
+            placeholder="Pegá un QR, URL o texto para investigar..."
+            value={customQrInput}
+            onChange={(e) => setCustomQrInput(e.target.value)}
+            className="flex-1 rounded-xl border border-kraft/60 bg-cream px-3 py-2 text-xs font-medium text-ink placeholder:text-muted-foreground"
+          />
+          <button
+            type="submit"
+            className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition shadow-xs"
+          >
+            <Search className="h-3.5 w-3.5" /> Analizar
+          </button>
+        </form>
+
         {/* Feedback interactivo */}
         {feedback && (
           <div
@@ -265,12 +313,13 @@ function EscanerPage() {
             <p className="text-xs font-extrabold uppercase tracking-wider">Tus puntos acumulados</p>
             <p className="display text-3xl">{user?.puntos ?? 0} pts</p>
           </div>
-          <PaperTape color="leaf">Escáner Activo</PaperTape>
+          <PaperTape color="leaf">Investigador Listo</PaperTape>
         </div>
 
         <div className="border-t border-kraft/40 pt-3">
           <p className="mb-2 text-xs font-bold text-earth">
-            ¿Sin cámara o probando en el aula? Generá un depósito simulado verificado:
+            QRs de prueba para testear la investigación en vivo (abren la ventana flotante de
+            información):
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -293,6 +342,20 @@ function EscanerPage() {
               className="rounded-xl border border-primary/50 bg-cream px-3 py-1.5 text-xs font-bold text-ink shadow-xs transition hover:bg-primary/15 active:scale-95"
             >
               🥫 Lata Aluminio (+40 pts)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleCode("https://www.argentina.gob.ar/ambiente/economia-circular")}
+              className="rounded-xl border border-earth/50 bg-white px-3 py-1.5 text-xs font-bold text-ink shadow-xs transition hover:bg-earth/10 active:scale-95"
+            >
+              🌐 Sitio Web Ministerio Ambiental
+            </button>
+            <button
+              type="button"
+              onClick={() => handleCode("LOTE-COOP-RECICLADOS-2026-FIBRA-TEXTIL-PEAD")}
+              className="rounded-xl border border-earth/50 bg-white px-3 py-1.5 text-xs font-bold text-ink shadow-xs transition hover:bg-earth/10 active:scale-95"
+            >
+              🏷️ Etiqueta de Trazabilidad Lote
             </button>
           </div>
         </div>
@@ -390,6 +453,21 @@ function EscanerPage() {
             </form>
           </PaperCard>
         </div>
+      )}
+
+      {/* Ventanita Flotante Inteligente de Investigación QR */}
+      {investigatingCode && (
+        <SmartQrModal
+          code={investigatingCode}
+          onClose={() => setInvestigatingCode(null)}
+          onConfirmCanje={
+            investigatingCode.startsWith("KV|")
+              ? () => {
+                  setInvestigatingCode(null);
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );

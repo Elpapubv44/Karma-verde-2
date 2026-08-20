@@ -1,0 +1,124 @@
+================================================================================
+PAQUETE DE CONTEXTO ARQUITECTÓNICO Y CÓDIGO FUENTE COMPLETO
+PROYECTO: Karmaverde - Plataforma de Economía Circular Escolar
+DESTINATARIO: Kimi K3 / LLM de Gran Contexto
+================================================================================
+
+ESTRUCTURA DE PROMPTS MODULARES:
+- PROMPT 1: Arquitectura, Dominio de Negocio, Schemas y Tipos Base
+- PROMPT 2: Estado Global, Seguridad, Validaciones Geográficas y Lógica QR
+- PROMPT 3: Vistas Clave de Usuario (Escáner Alumno, Logística y Directivos)
+- PROMPT 4: Backend Híbrido, Endpoints API, Configuración de Servidor y Guías
+
+================================================================================
+PROMPT 1 / 4: ARQUITECTURA DE NEGOCIO, DOMINIO Y ESQUEMA DE DATOS
+================================================================================
+
+[ROL DEL MODELO]
+Eres un Ingeniero Principal de Software y Arquitecto Full Stack. Estás analizando el proyecto "Karmaverde", una solución integral de economía circular escolar para escuelas secundarias técnicas.
+
+[OBJETIVO GENERAL DEL PROYECTO]
+Karmaverde conecta escuelas técnicas con cooperativas de reciclaje y centros de transformación. Los alumnos recolectan y pesan residuos reciclables (PET, PEAD, Aluminio, Cartón, Tapitas) mediante códigos QR con firmas criptográficas de un solo uso. Las cooperativas retiran el material y lo procesan en materia prima (madera plástica y filamento 3D) para fabricar pupitres, bancos y herramientas para los propios talleres escolares.
+
+[ROLES DE USUARIO Y MODELO DE PERMISOS]
+1. ALUMNO: Escanea QRs de puntos de depósito, registra entregas con balanza, acumula puntos personales y para su división, canjea insumos técnicos y consulta módulos educativos.
+2. ASOCIADO (Cooperativas/Logística): Monitorea stock de fardos en escuelas, planifica hojas de ruta de camiones, confirma retiros físicos y abastece a plantas de extrusión.
+3. CREADOR (Docentes/Directivos): Administra circuito de economía circular de la escuela, valida stock para fabricación de bancos escolares, gestiona catálogo de premios e incentivos de taller.
+4. SUPERIOR (Administrador de Red/Ministerio): Supervisa métricas globales de toneladas recuperadas, emisiones de CO2 mitigadas, gestión multiescuela y configuración de módulos.
+
+[REGLAS DE NEGOCIO CRÍTICAS]
+- Criptografía de Códigos QR: Formato `KV|<MATERIAL>|<PESO_KG>|<ID_ESCUELA>|<ID_PUNTO>`. Generación de hash SHA-256 único por canje para prevenir ataques de replay.
+- Geofencing Estricto: Solo se permite el inicio de sesión a usuarios dentro de un radio geodésico de 50 km respecto a una escuela técnica o centro de acopio registrado (fórmula de Haversine).
+- Doble Motor de Inteligencia (IA + Local): Detección automática de fuentes (artículos de Wikipedia, papers de investigación científica, sitios web y plásticos industriales).
+
+[TYPESCRIPT: DEFINICIÓN DE TIPOS (src/lib/types.ts)]
+```typescript
+export type UserRole = "alumno" | "asociado" | "creador" | "superior";
+
+export type MaterialReciclable = "PET" | "PEAD" | "Cartón" | "Aluminio" | "Tapitas" | "RAEEs";
+
+export interface User {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: UserRole;
+  escuelaId?: string;
+  cooperativaId?: string;
+  curso?: string;
+  division?: string;
+  puntos: number;
+  puntosHistoricos: number;
+  kilosAportados: number;
+  avatarUrl?: string;
+}
+
+export interface Escuela {
+  id: string;
+  nombre: string;
+  cue: string;
+  direccion: string;
+  lat: number;
+  lng: number;
+  telefono: string;
+  responsable: string;
+  talleresIds: string[];
+  activa: boolean;
+  kilosHistoricos: number;
+  puntosHistoricos: number;
+}
+
+export interface CentroRecoleccion {
+  id: string;
+  nombre: string;
+  cooperativa: string;
+  direccion: string;
+  lat: number;
+  lng: number;
+  horario: string;
+  capacidadMaximaKg: number;
+  stockActualKg: number;
+  materialesAceptados: MaterialReciclable[];
+  esPlantaTransformacion: boolean;
+}
+
+export interface Entrega {
+  id: string;
+  alumnoId: string;
+  escuelaId: string;
+  material: MaterialReciclable;
+  kilos: number;
+  puntos: number;
+  fecha: string;
+  codigoQr: string;
+  hashVerificacion: string;
+  validadoPorDocente: boolean;
+  docenteId?: string;
+}
+
+export interface Retiro {
+  id: string;
+  escuelaId: string;
+  centroId: string;
+  choferId: string;
+  patenteCamion: string;
+  fechaRetiro: string;
+  kilosTotales: number;
+  detallesPorMaterial: { material: MaterialReciclable; kilos: number }[];
+  estado: "programado" | "en_camino" | "completado" | "cancelado";
+  remitoDigitalHash: string;
+}
+
+export interface Premio {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  costoPuntos: number;
+  stockDisponible: number;
+  categoria: "taller" | "escolar" | "sustentable" | "experiencia";
+  origenCircular: boolean; // Ej: filamento 3D reciclado en la cooperativa
+}
+```
+
+================================================================================
+FIN DE PROMPT 1. (Continúa con el Prompt 2 para la lógica de estado y validaciones).
+================================================================================

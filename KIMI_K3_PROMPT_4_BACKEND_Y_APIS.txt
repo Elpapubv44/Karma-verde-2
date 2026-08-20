@@ -1,0 +1,128 @@
+================================================================================
+PROMPT 4 / 4: BACKEND HÍBRIDO (NODE/VITE/PHP), PROXIES Y GUÍA DE DESPLIEGUE
+================================================================================
+
+[CONTEXTO CONTINUO]
+Este archivo proporciona el código del backend para ejecutar Karmaverde tanto en Node.js/Express como en PHP/MySQL para servidores locales tipo XAMPP o producción.
+
+[MÓDULO: ANALIZADOR GEMINI / FALLBACK (src/lib/gemini-qr-analyzer.ts)]
+```typescript
+import { GoogleGenAI } from "@google/genai";
+
+export async function handleAnalyzeQrRequest(request: Request): Promise<Response> {
+  try {
+    const { code } = (await request.json()) as { code?: string };
+    const targetCode = typeof code === "string" ? code : "";
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    const isKeyValid = apiKey && typeof apiKey === "string" && apiKey.trim().length > 15;
+
+    if (isKeyValid) {
+      try {
+        const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+        const prompt = `Analiza este código QR, URL o residuo: "${targetCode}". Retorna solo un JSON con campos: objeto, origen, tipoMaterial, reciclabilidad, descripcion, impactoEstimado, consejo.`;
+
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: { responseMimeType: "application/json" },
+        });
+
+        return new Response(
+          JSON.stringify({ source: "gemini", analysis: JSON.parse(response.text || "{}") }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      } catch {
+        // Fallback inmediato
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ source: "local", analysis: generateLocalAnalysis(targetCode) }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  } catch {
+    return new Response(
+      JSON.stringify({ source: "local-fallback", analysis: generateLocalAnalysis("desconocido") }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }
+}
+
+export function generateLocalAnalysis(code: string) {
+  const lower = code.toLowerCase();
+  
+  if (lower.startsWith("http://") || lower.startsWith("https://")) {
+    let domain = "sitio web";
+    try { domain = new URL(code).hostname.toLowerCase(); } catch {}
+
+    if (domain.includes("wikipedia.org") || lower.includes("wiki")) {
+      const topic = decodeURIComponent(code.split("/").pop() || "Reciclaje").replace(/_/g, " ");
+      return {
+        objeto: `Artículo Enciclopédico: "${topic}"`,
+        origen: `Wikipedia Foundation (${domain})`,
+        tipoMaterial: "Documento Digital / Información Abierta",
+        reciclabilidad: "Informativo / Académico",
+        descripcion: `Contenido enciclopédico sobre "${topic}". Explica fundamentos científicos y procesos de recuperación de recursos.`,
+        impactoEstimado: "La educación ambiental abierta acelera la adopción de prácticas sostenibles.",
+        consejo: "Revisa la sección de bibliografía y referencias para profundizar.",
+      };
+    }
+
+    if (domain.includes("sciencedirect") || domain.includes("researchgate") || lower.includes("paper")) {
+      return {
+        objeto: "Paper Científico / Estudio de Investigación",
+        origen: `Repositorio Académico (${domain})`,
+        tipoMaterial: "Literatura Científica Peer-Reviewed",
+        reciclabilidad: "Académico / Evidencia Científica",
+        descripcion: "Documento técnico revisado por pares con metodología y mediciones sobre polímeros o economía circular.",
+        impactoEstimado: "Fundamenta las decisiones de reciclaje con datos científicos validados.",
+        consejo: "Lee el resumen (Abstract) y las conclusiones principales.",
+      };
+    }
+  }
+
+  if (lower.includes("pet") || lower.includes("kv|pet")) {
+    return {
+      objeto: "Botella / Envase PET #1",
+      origen: "Punto Verde Karmaverde",
+      tipoMaterial: "PET (Polietileno Tereftalato)",
+      reciclabilidad: "Alta (100% Circular)",
+      descripcion: "Residuo plástico post-consumo apto para transformación en filamento 3D o madera plástica.",
+      impactoEstimado: "Por cada 1 kg se ahorran 24L de agua y 1.85 kg de CO₂.",
+      consejo: "Asegúrate de que esté seco, aplastado y con tapita.",
+    };
+  }
+
+  return {
+    objeto: `Código Detectado ("${code.slice(0, 30)}")`,
+    origen: "Lector General de Puntos y Etiquetas",
+    tipoMaterial: "Identificador de Trazabilidad",
+    reciclabilidad: "Variable",
+    descripcion: `Identificador alfanumérico registrado en el sistema.`,
+    impactoEstimado: "El etiquetado digital permite un 99.8% de precisión en trazabilidad.",
+    consejo: "Llévalo al punto limpio central si requiere clasificación asistida.",
+  };
+}
+```
+
+[SERVIDOR DE DESPLIEGUE EN PRODUCCIÓN (src/server.ts)]
+```typescript
+import { handleAnalyzeQrRequest } from "./lib/gemini-qr-analyzer";
+
+export default {
+  async fetch(request: Request, env: unknown, ctx: unknown) {
+    const url = new URL(request.url);
+    if (url.pathname === "/api/analyze-qr" && request.method === "POST") {
+      return await handleAnalyzeQrRequest(request);
+    }
+    // Renderizado SPA / SSR
+    return new Response("Karmaverde App Running", { status: 200 });
+  },
+};
+```
+
+================================================================================
+FIN DE PAQUETE DE CONTEXTO. 
+Todos los archivos están listos para alimentar a Kimi K3 en sesiones de hasta 150k-200k tokens.
+================================================================================

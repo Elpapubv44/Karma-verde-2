@@ -1,0 +1,134 @@
+================================================================================
+PROMPT 2 / 4: ESTADO GLOBAL (STORE), GEOFENCING HAVERSINE Y CRIPTOGRAFÍA QR
+================================================================================
+
+[CONTEXTO CONTINUO]
+Este archivo proporciona la capa de persistencia reactiva (Zustand-like/LocalStorage), el motor de validación geográfica de 50 km y la generación/verificación de hashes para las entregas de materiales.
+
+[MÓDULO: VALIDACIÓN GEOGRÁFICA (src/lib/geo-validation.ts)]
+```typescript
+import { ESCUELAS_MOCK, CENTROS_MOCK } from "./mock-data";
+
+export interface GeoLocationCoords {
+  lat: number;
+  lng: number;
+}
+
+export interface GeoValidationResult {
+  allowed: boolean;
+  distanceKm: number;
+  closestPointName: string;
+  closestPointType: "escuela" | "centro";
+  maxRadiusKm: number;
+  coords?: GeoLocationCoords;
+  error?: string;
+}
+
+const MAX_RADIUS_KM = 50;
+
+/**
+ * Fórmula de Haversine para cálculo geodésico exacto en kilómetros
+ */
+export function calculateHaversineDistanceKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371; // Radio medio de la Tierra en km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
+
+/**
+ * Valida proximidad física contra todas las escuelas y centros activos
+ */
+export function validateProximity(
+  userLat: number,
+  userLng: number,
+  maxRadiusKm: number = MAX_RADIUS_KM,
+): GeoValidationResult {
+  let minDistance = Infinity;
+  let closestName = "";
+  let closestType: "escuela" | "centro" = "escuela";
+
+  for (const esc of ESCUELAS_MOCK) {
+    if (esc.activa) {
+      const dist = calculateHaversineDistanceKm(userLat, userLng, esc.lat, esc.lng);
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestName = esc.nombre;
+        closestType = "escuela";
+      }
+    }
+  }
+
+  for (const centro of CENTROS_MOCK) {
+    const dist = calculateHaversineDistanceKm(userLat, userLng, centro.lat, centro.lng);
+    if (dist < minDistance) {
+      minDistance = dist;
+      closestName = centro.nombre;
+      closestType = "centro";
+    }
+  }
+
+  return {
+    allowed: minDistance <= maxRadiusKm,
+    distanceKm: minDistance === Infinity ? 0 : minDistance,
+    closestPointName: closestName,
+    closestPointType: closestType,
+    maxRadiusKm,
+    coords: { lat: userLat, lng: userLng },
+  };
+}
+
+export function getCurrentUserLocation(): Promise<GeoLocationCoords> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocalización no disponible."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (err) => reject(new Error(err.message || "Error al leer GPS.")),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  });
+}
+```
+
+[MÓDULO: CRIPTOGRAFÍA Y VERIFICACIÓN QR (src/lib/qr.ts)]
+```typescript
+export async function sha256(message: string): Promise<string> {
+  const msgUint8 = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export function parseQrContent(raw: string) {
+  const parts = raw.split("|");
+  if (parts.length >= 5 && parts[0] === "KV") {
+    return {
+      isValid: true,
+      material: parts[1],
+      kilos: parseFloat(parts[2]) || 1.0,
+      escuelaId: parts[3],
+      puntoId: parts[4],
+    };
+  }
+  return { isValid: false };
+}
+```
+
+================================================================================
+FIN DE PROMPT 2. (Continúa con el Prompt 3 para las interfaces y el escáner inteligente).
+================================================================================
