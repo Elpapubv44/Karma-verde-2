@@ -1,0 +1,6 @@
+{
+  "name": "Karmaverde",
+  "description": "Eco-recycling papercraft web platform for schools with interactive green point map, QR scanner, rewards shop, and creator management.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
