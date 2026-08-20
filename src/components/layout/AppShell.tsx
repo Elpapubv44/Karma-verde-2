@@ -35,7 +35,7 @@ const alumnoNav: NavItem[] = [
   { to: "/alumno/ranking", label: "Ranking", icon: Trophy },
   { to: "/alumno/premios", label: "Premios", icon: Gift },
   { to: "/alumno/viaje", label: "Viaje", icon: Truck },
-  { to: "/alumno/aprende", label: "Aprende", icon: BookOpen },
+  { to: "/alumno/aprende", label: "Aprende", icon: Sparkles },
 ];
 
 const creadorNav: NavItem[] = [
