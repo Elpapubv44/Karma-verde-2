@@ -38,10 +38,6 @@ import {
 import { api, usingMocks, ApiError, isOffline } from "./api";
 import { parseQr, yaUsado, marcarUsado } from "./qr";
 
-export const CREATOR_CODE = "KARMA-VERDE-2026";
-export const SUPERIOR_CODE = "KARMA-SUPER-2026";
-export const ASOCIADO_CODE = "KARMA-ESCUELA-2026";
-
 export const ROL_HOME: Record<Rol, string> = {
   alumno: "/alumno",
   creador: "/creador",
@@ -263,36 +259,34 @@ export async function register(input: RegisterInput): Promise<{ ok: boolean; err
   const pwCheck = validarPasswordFuerte(input.password);
   if (!pwCheck.valida) return { ok: false, error: pwCheck.error ?? "Contraseña insegura." };
 
-  if (input.rol === "creador" && input.codigo !== CREATOR_CODE) {
-    return { ok: false, error: "Código de Creador inválido." };
-  }
-  if (input.rol === "superior" && input.codigo !== SUPERIOR_CODE) {
-    return { ok: false, error: "Código de Superior inválido." };
-  }
-  if (input.rol === "asociado" && input.codigo !== ASOCIADO_CODE) {
-    return { ok: false, error: "Código de Asociado inválido." };
-  }
-
   const em = input.email.trim().toLowerCase();
 
   if (!usingMocks()) {
     try {
+      if (input.rol !== "alumno") {
+        const validation = await api.validateCode(
+          input.codigo ?? "",
+          input.rol as "creador" | "superior" | "asociado",
+        );
+        if (!validation.valid) return { ok: false, error: "Código de acceso inválido." };
+      }
       const res = await api.register({
         nombre: input.nombre.trim(),
         email: em,
         password: input.password,
         rol: input.rol,
         escuela: input.escuela.trim(),
+        codigo: input.codigo,
       });
       setState({
         user: {
-          id: res.id,
-          nombre: res.nombre,
-          email: res.email,
-          rol: res.rol,
-          escuela: res.escuela,
-          puntos: res.puntos,
-          canjes: res.canjes,
+          id: res.user.id,
+          nombre: res.user.nombre,
+          email: res.user.email,
+          rol: res.user.rol,
+          escuela: res.user.escuela,
+          puntos: res.user.puntos,
+          canjes: res.user.canjes,
           curso: input.curso,
         },
       });
@@ -339,13 +333,13 @@ export async function login(
     try {
       const res = await api.login({ email: em, password });
       const user: User = {
-        id: res.id,
-        nombre: res.nombre,
-        email: res.email,
-        rol: res.rol,
-        escuela: res.escuela,
-        puntos: res.puntos,
-        canjes: res.canjes,
+        id: res.user.id,
+        nombre: res.user.nombre,
+        email: res.user.email,
+        rol: res.user.rol,
+        escuela: res.user.escuela,
+        puntos: res.user.puntos,
+        canjes: res.user.canjes,
       };
       if (rolEsperado && user.rol !== rolEsperado) {
         return {

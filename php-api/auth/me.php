@@ -3,10 +3,13 @@
  * Karmaverde — ME (usuario actual de sesión).
  * GET
  */
-session_start();
+require __DIR__ . '/../config/cors.php';
+require __DIR__ . '/../config/session.php';
+require __DIR__ . '/../config/rate-limit.php';
 header('Content-Type: application/json');
 require __DIR__ . '/../config/db.php';
 require __DIR__ . '/../queries/usuarios.php';
+checkRateLimit('auth/me');
 
 $userId = $_SESSION['user_id'] ?? null;
 

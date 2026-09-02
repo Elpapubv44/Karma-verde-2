@@ -3,12 +3,16 @@
  * Karmaverde — REGISTRO de usuarios (todos los roles).
  * POST { nombre, email, password, rol, escuela, codigo? }
  */
-session_start();
+require __DIR__ . '/../config/cors.php';
+require __DIR__ . '/../config/session.php';
+require __DIR__ . '/../config/auth.php';
+require __DIR__ . '/../config/rate-limit.php';
 header('Content-Type: application/json');
 require __DIR__ . '/../config/db.php';
 require __DIR__ . '/../queries/usuarios.php';
+checkRateLimit('auth/register', 5, 900);
 
-$data = json_decode(file_get_contents('php://input'), true) ?? [];
+$data = requireJsonRequest();
 
 $nombre   = trim($data['nombre']   ?? '');
 $email    = trim($data['email']    ?? '');
@@ -17,7 +21,7 @@ $rol      = $data['rol']     ?? 'alumno';
 $escuela  = trim($data['escuela']  ?? '');
 $codigo   = trim($data['codigo']   ?? '');
 
-if ($nombre === '' || $email === '' || strlen($password) < 4 || $escuela === '') {
+if ($nombre === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 10 || $escuela === '') {
     http_response_code(400);
     echo json_encode(['error' => 'Datos incompletos']);
     exit;
@@ -31,20 +35,16 @@ if (!in_array($rol, $validRoles, true)) {
 }
 
 // 🔒 Validación de códigos de acceso según rol
-if ($rol === 'creador' && $codigo !== KARMAVERDE_CREATOR_CODE) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Código de organizador incorrecto']);
-    exit;
-}
-if ($rol === 'superior' && $codigo !== KARMAVERDE_SUPERIOR_CODE) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Código de acceso superior incorrecto']);
-    exit;
-}
-if ($rol === 'asociado' && $codigo !== KARMAVERDE_ASOCIADO_CODE) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Código de acceso asociado incorrecto']);
-    exit;
+if ($rol !== 'alumno') {
+    $envNames = [
+        'creador' => 'KARMAVERDE_CREATOR_CODE',
+        'superior' => 'KARMAVERDE_SUPERIOR_CODE',
+        'asociado' => 'KARMAVERDE_ASOCIADO_CODE',
+    ];
+    $expected = getenv($envNames[$rol]) ?: '';
+    if ($expected === '' || !hash_equals($expected, $codigo)) {
+        jsonError(403, 'Código de acceso incorrecto');
+    }
 }
 
 if (usuarioPorEmail($pdo, $email)) {
@@ -54,8 +54,12 @@ if (usuarioPorEmail($pdo, $email)) {
 }
 
 $id = crearUsuario($pdo, compact('nombre', 'email', 'password', 'rol', 'escuela'));
+session_regenerate_id(true);
 $_SESSION['user_id'] = $id;
 $_SESSION['rol']     = $rol;
+$_SESSION['login_time'] = time();
+$_SESSION['last_activity'] = time();
+$_SESSION['rotated_at'] = time();
 
 echo json_encode([
     'user' => [

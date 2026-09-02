@@ -1,18 +1,10 @@
 <?php
 /**
- * Karmaverde — Conexión abierta a MySQL con PDO y soporte CORS / Session.
+ * Karmaverde — Conexión PDO. This file must only be included by endpoints.
  */
-
-// Headers CORS para permitir peticiones del frontend (SPA)
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
-header("Access-Control-Allow-Origin: $origin");
-header('Access-Control-Allow-Credentials: true');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
+if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_NAME'] ?? '') === 'db.php') {
+    http_response_code(403);
+    exit('Acceso denegado');
 }
 
 // ————— Credenciales de la base de datos —————
@@ -21,11 +13,6 @@ $dbname   = getenv('DB_NAME') ?: 'karmaverde';
 $username = getenv('DB_USER') ?: 'root';
 $password = getenv('DB_PASS') ?: '';
 $charset  = 'utf8mb4';
-
-// ————— Códigos Especiales de Acceso —————
-define('KARMAVERDE_CREATOR_CODE',  'KARMA-VERDE-2026');
-define('KARMAVERDE_SUPERIOR_CODE', 'KARMA-SUPER-2026');
-define('KARMAVERDE_ASOCIADO_CODE', 'KARMA-ESCUELA-2026');
 
 // ————— Conexión PDO —————
 $dsn = "mysql:host=$host;dbname=$dbname;charset=$charset";
@@ -40,6 +27,6 @@ try {
 } catch (PDOException $e) {
     http_response_code(500);
     header('Content-Type: application/json');
-    echo json_encode(['error' => 'DB connection failed', 'detail' => $e->getMessage()]);
+    echo json_encode(['error' => 'No se pudo conectar con el servicio de datos']);
     exit;
 }
