@@ -1,15 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { PaperCard, PaperTape, PaperButton } from "@/components/paper/Paper";
-import {
-  ASOCIADO_CODE,
-  CREATOR_CODE,
-  SUPERIOR_CODE,
-  actualizarSystemFlags,
-  crearAnuncio,
-  eliminarAnuncio,
-  useStore,
-} from "@/lib/store";
+import { actualizarSystemFlags, crearAnuncio, eliminarAnuncio, useStore } from "@/lib/store";
 import {
   ShieldAlert,
   KeyRound,
@@ -20,8 +12,6 @@ import {
   Calendar,
   AlertTriangle,
   Lock,
-  Eye,
-  EyeOff,
   Save,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,7 +21,6 @@ export const Route = createFileRoute("/_app/superior/config")({
 });
 
 export function SuperiorConfig() {
-  const [reveal, setReveal] = useState(false);
   const systemFlags = useStore((s) => s.systemFlags);
   const anuncios = useStore((s) => s.anuncios || []);
   const user = useStore((s) => s.user);
@@ -277,54 +266,16 @@ export function SuperiorConfig() {
         </div>
       </PaperCard>
 
-      {/* Códigos de Acceso Maestro */}
+      {/* Acceso a roles privilegiados */}
       <PaperCard className="space-y-3 p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-ink">
-            <KeyRound className="h-5 w-5 text-primary" />
-            <h2 className="display text-2xl">Códigos de Registro Autorizado</h2>
-          </div>
-          <button
-            onClick={() => setReveal((r) => !r)}
-            className="flex items-center gap-1.5 rounded-full border-2 border-kraft bg-cream px-3 py-1.5 text-xs font-extrabold text-ink hover:bg-kraft/20 transition active:scale-95"
-          >
-            {reveal ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            <span>{reveal ? "Ocultar" : "Mostrar Códigos"}</span>
-          </button>
+        <div className="flex items-center gap-2 text-ink">
+          <KeyRound className="h-5 w-5 text-primary" />
+          <h2 className="display text-2xl">Acceso a roles privilegiados</h2>
         </div>
         <p className="text-xs text-muted-foreground">
-          Compartí estos tokens de seguridad exclusivamente con personal directivo, docentes
-          creadores y cooperativas asociadas.
+          Los códigos de alta no se exponen en el navegador. Administralos exclusivamente como
+          secretos del servidor y distribuilos por un canal seguro al personal autorizado.
         </p>
-
-        {reveal && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-            <div className="rounded-2xl border-2 border-kraft/60 bg-cream p-3 text-center">
-              <span className="text-[10px] font-black uppercase tracking-wider text-earth block">
-                Rol Creador
-              </span>
-              <code className="text-sm font-black font-mono text-primary block mt-1">
-                {CREATOR_CODE}
-              </code>
-            </div>
-            <div className="rounded-2xl border-2 border-kraft/60 bg-cream p-3 text-center">
-              <span className="text-[10px] font-black uppercase tracking-wider text-earth block">
-                Rol Asociado / Cooperativa
-              </span>
-              <code className="text-sm font-black font-mono text-primary block mt-1">
-                {ASOCIADO_CODE}
-              </code>
-            </div>
-            <div className="rounded-2xl border-2 border-kraft/60 bg-cream p-3 text-center">
-              <span className="text-[10px] font-black uppercase tracking-wider text-earth block">
-                Rol Superior / Admin
-              </span>
-              <code className="text-sm font-black font-mono text-primary block mt-1">
-                {SUPERIOR_CODE}
-              </code>
-            </div>
-          </div>
-        )}
       </PaperCard>
     </div>
   );

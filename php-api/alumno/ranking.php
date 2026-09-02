@@ -3,9 +3,13 @@
  * Karmaverde — Ranking de alumnos
  * GET
  */
+require __DIR__ . '/../config/cors.php';
+require __DIR__ . '/../config/session.php';
+require __DIR__ . '/../config/rate-limit.php';
 header('Content-Type: application/json');
 require __DIR__ . '/../config/db.php';
 require __DIR__ . '/../queries/usuarios.php';
+checkRateLimit('alumno/ranking');
 
 $ranking = obtenerRanking($pdo);
 

@@ -3,10 +3,15 @@
  * Karmaverde — Gestión de Tareas de Logística (Rol Asociado)
  * GET, POST, DELETE
  */
-session_start();
+require __DIR__ . '/../config/cors.php';
+require __DIR__ . '/../config/session.php';
+require __DIR__ . '/../config/auth.php';
+require __DIR__ . '/../config/rate-limit.php';
 header('Content-Type: application/json');
 require __DIR__ . '/../config/db.php';
 require __DIR__ . '/../queries/contenido.php';
+checkRateLimit('asociado/tareas');
+requireRole(['asociado', 'superior']);
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -29,7 +34,7 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
-    $data = json_decode(file_get_contents('php://input'), true) ?? [];
+    $data = requireJsonRequest();
     $id = isset($data['id']) && is_numeric($data['id']) ? (int)$data['id'] : null;
 
     if ($id) {

@@ -4,13 +4,18 @@
  */
 
 function crearUsuario(PDO $pdo, array $u): int {
+    $pepper = getenv('PASSWORD_PEPPER');
+    if (!$pepper) {
+        throw new RuntimeException('PASSWORD_PEPPER no está configurada');
+    }
+    $pepperedPassword = hash_hmac('sha256', $u['password'], $pepper);
     $sql = "INSERT INTO usuarios (nombre, email, password_hash, rol, escuela, puntos, canjes)
             VALUES (:nombre, :email, :hash, :rol, :escuela, 0, 0)";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
         ':nombre'  => $u['nombre'],
         ':email'   => strtolower(trim($u['email'])),
-        ':hash'    => password_hash($u['password'], PASSWORD_BCRYPT),
+        ':hash'    => password_hash($pepperedPassword, PASSWORD_BCRYPT, ['cost' => 12]),
         ':rol'     => $u['rol'],
         ':escuela' => $u['escuela'],
     ]);

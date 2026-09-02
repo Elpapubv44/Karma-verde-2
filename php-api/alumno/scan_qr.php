@@ -3,10 +3,15 @@
  * Karmaverde — Validación y consumo de código QR
  * POST { codigo }
  */
-session_start();
+require __DIR__ . '/../config/cors.php';
+require __DIR__ . '/../config/session.php';
+require __DIR__ . '/../config/auth.php';
+require __DIR__ . '/../config/rate-limit.php';
 header('Content-Type: application/json');
 require __DIR__ . '/../config/db.php';
 require __DIR__ . '/../queries/usuarios.php';
+checkRateLimit('alumno/scan_qr', 30, 60);
+requireRole(['alumno', 'creador', 'superior']);
 
 $userId = $_SESSION['user_id'] ?? null;
 if (!$userId) {
@@ -15,7 +20,7 @@ if (!$userId) {
     exit;
 }
 
-$data = json_decode(file_get_contents('php://input'), true) ?? [];
+$data = requireJsonRequest();
 $raw = trim($data['codigo'] ?? '');
 
 if ($raw === '') {

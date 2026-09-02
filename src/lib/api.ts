@@ -5,6 +5,7 @@
  *   van al backend PHP y se guardan directamente en SQL.
  * ▸ Incluye endpoints completos para todos los roles (alumno, creador, superior, asociado).
  */
+import { setGlobalLoading } from "@/hooks/use-loading";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 const BASE = RAW_BASE.replace(/\/+$/, "");
@@ -24,23 +25,37 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, opts: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(path: string, opts: RequestInit = {}, retries = 2): Promise<T> {
   if (usingMocks()) {
     throw new ApiError(0, null, "API no configurada (mock mode)");
   }
+  setGlobalLoading(true);
   let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`, {
-      credentials: "include", // cookie PHPSESSID
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        ...(opts.headers ?? {}),
-      },
-      ...opts,
-    });
-  } catch {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10_000);
+    try {
+      res = await fetch(`${BASE}${path}`, {
+        credentials: "include", // cookie PHPSESSID
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(opts.headers ?? {}),
+        },
+        ...opts,
+        signal: opts.signal ?? controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (error) {
+    if (retries > 0 && !(error instanceof DOMException && error.name === "AbortError")) {
+      await new Promise((resolve) => setTimeout(resolve, (3 - retries) * 500));
+      return apiFetch<T>(path, opts, retries - 1);
+    }
     throw new ApiError(0, null, OFFLINE_MESSAGE);
+  } finally {
+    setGlobalLoading(false);
   }
 
   const text = await res.text();
@@ -72,16 +87,22 @@ export const api = {
     escuela: string;
     codigo?: string;
   }) =>
-    apiFetch<{ user: unknown }>("/auth/register.php", {
+    apiFetch<{ user: ApiUser }>("/auth/register.php", {
       method: "POST",
       body: JSON.stringify(body),
     }),
 
   login: (body: { email: string; password: string }) =>
-    apiFetch<{ user: unknown }>("/auth/login.php", { method: "POST", body: JSON.stringify(body) }),
+    apiFetch<{ user: ApiUser }>("/auth/login.php", { method: "POST", body: JSON.stringify(body) }),
 
   logout: () => apiFetch<{ ok: true }>("/auth/logout.php", { method: "POST" }),
-  me: () => apiFetch<{ user: unknown | null }>("/auth/me.php"),
+  me: () => apiFetch<{ user: ApiUser | null }>("/auth/me.php"),
+
+  validateCode: (code: string, rol: "creador" | "superior" | "asociado") =>
+    apiFetch<{ valid: boolean }>("/auth/validate_code.php", {
+      method: "POST",
+      body: JSON.stringify({ code, rol }),
+    }),
 
   // Alumno
   scan: (body: { material: string; puntos: number }) =>
@@ -161,3 +182,14 @@ export const api = {
       }),
   },
 };
+
+export interface ApiUser {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: "alumno" | "creador" | "superior" | "asociado";
+  escuela: string;
+  puntos: number;
+  canjes: number;
+  avatar?: string | null;
+}

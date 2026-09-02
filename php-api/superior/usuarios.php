@@ -3,19 +3,18 @@
  * Karmaverde — Gestión de Usuarios y Permisos (Rol Superior)
  * GET, POST, DELETE
  */
-session_start();
+require __DIR__ . '/../config/cors.php';
+require __DIR__ . '/../config/session.php';
+require __DIR__ . '/../config/auth.php';
+require __DIR__ . '/../config/rate-limit.php';
 header('Content-Type: application/json');
 require __DIR__ . '/../config/db.php';
 require __DIR__ . '/../queries/usuarios.php';
+checkRateLimit('superior/usuarios');
+requireRole(['superior']);
 
 $userId = $_SESSION['user_id'] ?? null;
 $userRole = $_SESSION['rol'] ?? null;
-
-// Validar que sea rol superior
-if ($userRole !== 'superior') {
-    // Si no está en sesión, chequear si viene en headers o permitir si está autenticado
-    // Para simplificar la integración:
-}
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -30,7 +29,7 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
-    $data = json_decode(file_get_contents('php://input'), true) ?? [];
+    $data = requireJsonRequest();
     $targetId = (int)($data['id'] ?? 0);
     $nuevoRol = $data['rol'] ?? '';
 
