@@ -117,7 +117,8 @@ export const seedQuizPreguntas: QuizPregunta[] = [
     respuestaCorrecta: 1,
     explicacion:
       "El plástico debe estar libre de líquidos orgánicos y compactado para maximizar el rendimiento del fardo y evitar olores.",
-    puntosPremio: 50,
+    puntosPremio: 25,
+    dificultad: "facil",
   },
   {
     id: "q2",
@@ -133,6 +134,7 @@ export const seedQuizPreguntas: QuizPregunta[] = [
     explicacion:
       "El aceite se adhiere a las fibras e impide que se mezclen con el agua en el pulper de reciclaje.",
     puntosPremio: 50,
+    dificultad: "medio",
   },
   {
     id: "q3",
@@ -141,7 +143,8 @@ export const seedQuizPreguntas: QuizPregunta[] = [
     respuestaCorrecta: 2,
     explicacion:
       "El aluminio conserva el 100% de sus propiedades metalúrgicas tras cada ciclo de fundición.",
-    puntosPremio: 50,
+    puntosPremio: 100,
+    dificultad: "dificil",
   },
 ];
 
@@ -258,6 +261,12 @@ export const seedCircuito: EtapaCircuito[] = [
     descripcion:
       "El estudiante clasifica sus plásticos limpios y secos en el punto verde escolar con validación de QR criptográfico.",
     estado: "activa",
+    imagen: "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=600&auto=format",
+    video: "https://www.youtube.com/embed/b7GMpjx2vTw",
+    galeria: [
+      "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=600&auto=format",
+      "https://images.unsplash.com/photo-1618477461853-cf6ed80faba5?w=600&auto=format",
+    ],
   },
   {
     orden: 2,
@@ -266,6 +275,9 @@ export const seedCircuito: EtapaCircuito[] = [
     descripcion:
       "El referente ambiental y la cooperativa asociada pesan el lote en balanza calibrada y emiten el remito digital de trazabilidad.",
     estado: "activa",
+    imagen: "https://images.unsplash.com/photo-1595278069441-2cf29f8005a4?w=600&auto=format",
+    video: "https://www.youtube.com/embed/VlRVPum9cp4",
+    galeria: ["https://images.unsplash.com/photo-1595278069441-2cf29f8005a4?w=600&auto=format"],
   },
   {
     orden: 3,
@@ -274,6 +286,9 @@ export const seedCircuito: EtapaCircuito[] = [
     descripcion:
       "En planta, el plástico se enfarda, se tritura en escamas (flakes) y pasa por tinas de densimetría para separar polímeros.",
     estado: "en_proceso",
+    imagen: "https://images.unsplash.com/photo-1588615419957-46294d137bfa?w=600&auto=format",
+    video: "https://www.youtube.com/embed/x1y5g_y4d58",
+    galeria: ["https://images.unsplash.com/photo-1588615419957-46294d137bfa?w=600&auto=format"],
   },
   {
     orden: 4,
@@ -282,6 +297,7 @@ export const seedCircuito: EtapaCircuito[] = [
     descripcion:
       "Las escamas fundidas se convierten en pellets de plástico reciclado (rPET/rPEAD) listos para nueva inyección.",
     estado: "pendiente",
+    imagen: "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&auto=format",
   },
   {
     orden: 5,
@@ -290,6 +306,7 @@ export const seedCircuito: EtapaCircuito[] = [
     descripcion:
       "El material vuelve como bancos escolares de madera plástica, mochilas y útiles para los estudiantes.",
     estado: "pendiente",
+    imagen: "https://images.unsplash.com/photo-1519682337058-a94d519337bc?w=600&auto=format",
   },
 ];
 
@@ -298,6 +315,8 @@ export const seedPuntosVerdes: PuntoVerde[] = [
     id: "pv1",
     nombre: "Contenedor Inteligente E.E.S.T. N° 3",
     escuela: "E.E.S.T. N° 3 Roberto Arlt",
+    direccion: "Av. Corrientes 1240, CABA",
+    horario: "Lunes a Viernes 7:30 a 18:30 hs",
     lat: -34.6037,
     lng: -58.3816,
     materiales: ["PET", "PEAD", "Cartón", "Aluminio"],
@@ -307,6 +326,8 @@ export const seedPuntosVerdes: PuntoVerde[] = [
     id: "pv2",
     nombre: "Estación Ecológica Belgrano Day",
     escuela: "Colegio Belgrano Day",
+    direccion: "Juramento 2850, Belgrano",
+    horario: "Lunes a Viernes 8:00 a 17:00 hs",
     lat: -34.5615,
     lng: -58.4563,
     materiales: ["PET", "PEAD", "Cartón"],
@@ -316,10 +337,33 @@ export const seedPuntosVerdes: PuntoVerde[] = [
     id: "pv3",
     nombre: "Punto Verde San Martín",
     escuela: "Instituto San Martín",
+    direccion: "Calle 85 N° 3200, San Martín",
+    horario: "Lunes a Sábados 8:00 a 19:00 hs",
     lat: -34.5772,
     lng: -58.5369,
-    materiales: ["PET", "Aluminio", "PEBD"],
+    materiales: ["PET", "Aluminio", "PEBD", "Vidrio"],
     puntosAcumulados: 650,
+  },
+];
+
+export const seedAnuncios = [
+  {
+    id: "an-1",
+    titulo: "¡Campaña Especial de Tapitas PEAD!",
+    contenido:
+      "Esta semana sumás doble puntaje (80 pts/kg) por traer tapitas plásticas clasificadas por color.",
+    autor: "Equipo Ambiental Karmaverde",
+    fecha: "2026-09-02",
+    urgente: true,
+  },
+  {
+    id: "an-2",
+    titulo: "Nueva entrega de bancos plásticos",
+    contenido:
+      "Gracias a los 250kg recolectados, la semana próxima se inauguran 2 bancos en el patio central.",
+    autor: "Dirección Escolar",
+    fecha: "2026-08-28",
+    urgente: false,
   },
 ];
 

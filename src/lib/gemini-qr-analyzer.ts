@@ -1,29 +1,38 @@
 import { GoogleGenAI } from "@google/genai";
 
 export async function handleAnalyzeQrRequest(request: Request): Promise<Response> {
+  let code = "";
   try {
-    const { code } = (await request.json()) as { code?: string };
-    if (!code || typeof code !== "string") {
-      return new Response(JSON.stringify({ error: "Código requerido" }), {
-        status: 400,
+    const body = (await request.json()) as { code?: string };
+    if (typeof body?.code === "string") {
+      code = body.code.trim();
+    }
+  } catch {
+    // Malformed JSON payload
+  }
+
+  if (!code) {
+    return new Response(JSON.stringify({ error: "Código requerido" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return new Response(
+      JSON.stringify({
+        source: "local-fallback",
+        analysis: generateLocalAnalysis(code),
+      }),
+      {
+        status: 200,
         headers: { "Content-Type": "application/json" },
-      });
-    }
+      },
+    );
+  }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({
-          source: "fallback",
-          analysis: generateLocalAnalysis(code),
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
+  try {
     const ai = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -48,19 +57,44 @@ Debes retornar un JSON con la siguiente estructura exacta:
   "consejo": "Consejo práctico para el alumno (cómo disponerlo, si es seguro abrirlo, o recomendación pedagógica)."
 }
 
-Responde ÚNICAMENTE el objeto JSON sin bloques de código markdown adicionados si es posible.
+Responde ÚNICAMENTE el objeto JSON sin bloques de código markdown si es posible.
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      },
-    });
+    let responseText = "";
+    // Primary model: gemini-3.8-flash for general text analysis
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+      responseText = response.text ?? "";
+    } catch (primaryError) {
+      // If 503 (model experiencing high demand) or transient, try gemini-3.1-flash-lite as secondary model
+      console.warn(
+        "Primary Gemini model busy or unavailable, trying secondary flash-lite model:",
+        primaryError,
+      );
+      const fallbackResponse = await ai.models.generateContent({
+        model: "gemini-3.1-flash-lite",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+      responseText = fallbackResponse.text ?? "";
+    }
 
-    const text = response.text ?? "";
-    const parsed = JSON.parse(text);
+    let cleanJson = responseText.trim();
+    if (cleanJson.startsWith("```")) {
+      cleanJson = cleanJson
+        .replace(/^```(?:json)?\n?/, "")
+        .replace(/\n?```$/, "")
+        .trim();
+    }
+    const parsed = JSON.parse(cleanJson);
 
     return new Response(
       JSON.stringify({
@@ -73,9 +107,12 @@ Responde ÚNICAMENTE el objeto JSON sin bloques de código markdown adicionados 
       },
     );
   } catch (error) {
-    console.error("Error analyzing QR with Gemini:", error);
-    // Fallback gracefully to offline intelligence
-    const fallback = generateLocalAnalysis(typeof request === "string" ? request : "desconocido");
+    console.warn(
+      "Gemini service currently unavailable (503/high-demand/network). Using local intelligence engine for scanned code:",
+      error,
+    );
+    // Graceful and instant fallback to local analysis for the scanned code
+    const fallback = generateLocalAnalysis(code);
     return new Response(
       JSON.stringify({
         source: "local-fallback",

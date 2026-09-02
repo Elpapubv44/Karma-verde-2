@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { selectRanking, selectEcoImpacto, useStore } from "@/lib/store";
 import { PaperCard, PaperTape, PaperButton } from "@/components/paper/Paper";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 import {
   QrCode,
   MapPin,
@@ -16,6 +17,10 @@ import {
   Zap,
   Target,
   Ticket,
+  Megaphone,
+  Calendar,
+  Flame,
+  CheckCircle2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/alumno/")({
@@ -37,6 +42,7 @@ function AlumnoHome() {
   const eco = useStore(selectEcoImpacto);
   const metas = useStore((s) => s.metasComunitarias);
   const tickets = useStore((s) => s.tickets);
+  const anuncios = useStore((s) => s.anuncios || []);
 
   const miEscuelaMeta = metas.find((m) => m.escuela === (user?.escuela ?? "")) ?? metas[0];
   const misTicketsPendientes = tickets.filter(
@@ -50,26 +56,107 @@ function AlumnoHome() {
     ? Math.min(100, Math.round((miEscuelaMeta.acumuladoKg / miEscuelaMeta.metaKg) * 100))
     : 0;
 
+  // Level calculation
+  const puntos = user?.puntos ?? 0;
+  const nivelActual =
+    puntos >= 1000
+      ? { nombre: "Titán Ambiental", sigNivel: "Nivel Máximo", meta: 1000, icono: "🏆" }
+      : puntos >= 500
+        ? { nombre: "Eco-Máster", sigNivel: "Titán Ambiental", meta: 1000, icono: "⭐" }
+        : puntos >= 200
+          ? { nombre: "Guardián Forestal", sigNivel: "Eco-Máster", meta: 500, icono: "🌿" }
+          : { nombre: "Brote Verde", sigNivel: "Guardián Forestal", meta: 200, icono: "🌱" };
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
       <PaperCard variant="leaf" tilt="l" className="text-primary-foreground p-6">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <PaperTape color="sun">Economía Circular Escolar</PaperTape>
-          {user?.curso && (
-            <span className="rounded-full bg-cream/20 px-3 py-1 text-xs font-bold">
-              {user.curso}
+          <div className="flex items-center gap-2">
+            {user?.curso && (
+              <span className="rounded-full bg-cream/20 px-3 py-1 text-xs font-bold">
+                {user.curso}
+              </span>
+            )}
+            <span className="rounded-full bg-sun/30 border border-sun text-ink px-2.5 py-0.5 text-xs font-black flex items-center gap-1">
+              <span>{nivelActual.icono}</span>
+              <span>{nivelActual.nombre}</span>
             </span>
-          )}
+          </div>
         </div>
-        <h1 className="display text-4xl">¡Hola, {user?.nombre}!</h1>
-        <p className="mt-1 text-sm opacity-90">{user?.escuela} · Sumá plástico limpio y ganá.</p>
+
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="display text-4xl">¡Hola, {user?.nombre}!</h1>
+            <p className="mt-1 text-sm opacity-90">
+              {user?.escuela} · Sumá plástico limpio y ganá.
+            </p>
+          </div>
+          <div className="hidden sm:grid h-16 w-16 place-items-center rounded-2xl bg-cream/20 text-3xl shadow-xs">
+            {user?.avatar ?? "🌱"}
+          </div>
+        </div>
+
         <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-          <Stat label="Puntos" value={user?.puntos ?? 0} icon={Sparkles} />
+          <div className="rounded-2xl bg-cream/95 p-3 text-center text-ink shadow-[var(--shadow-cutout)]">
+            <div className="flex items-center justify-center gap-1.5 text-primary mb-1">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-earth">
+                Puntos
+              </span>
+            </div>
+            <p className="display text-2xl leading-none">
+              <AnimatedCounter value={user?.puntos ?? 0} />
+            </p>
+          </div>
+
           <Stat label="Canjes" value={user?.canjes ?? 0} icon={Award} />
           <Stat label="Puesto" value={posicion ? `#${posicion}` : "—"} icon={TrendingUp} />
         </div>
       </PaperCard>
+
+      {/* Tablón de Anuncios Oficiales */}
+      {anuncios.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="display text-2xl text-ink flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-primary" />
+              Novedades y Campañas
+            </h2>
+            <span className="text-xs font-bold text-muted-foreground">
+              {anuncios.length} anuncio(s)
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {anuncios.slice(0, 2).map((a) => (
+              <PaperCard
+                key={a.id}
+                className={`p-4 ${a.importante ? "border-2 border-sun/80 bg-sun/10" : "bg-cream"}`}
+              >
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
+                      a.importante ? "bg-sun text-ink" : "bg-primary/15 text-primary"
+                    }`}
+                  >
+                    {a.importante ? "★ Importante" : "Aviso"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
+                    <Calendar className="h-3 w-3" />
+                    {a.fecha}
+                  </span>
+                </div>
+                <h3 className="font-extrabold text-sm text-ink">{a.titulo}</h3>
+                <p className="text-xs text-earth mt-1 leading-relaxed">{a.mensaje}</p>
+                <p className="text-[10px] font-bold text-muted-foreground mt-2 text-right">
+                  Por: {a.autor}
+                </p>
+              </PaperCard>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Active Vouchers Alert */}
       {misTicketsPendientes.length > 0 && (
@@ -141,7 +228,9 @@ function AlumnoHome() {
                 Agua Ahorrada
               </span>
             </div>
-            <p className="display text-2xl text-primary font-bold">{eco.litrosAguaAhorrados} L</p>
+            <p className="display text-2xl text-primary font-bold">
+              <AnimatedCounter value={eco.litrosAguaAhorrados} suffix=" L" />
+            </p>
             <p className="text-[10px] text-muted-foreground">en producción</p>
           </PaperCard>
 
@@ -152,7 +241,9 @@ function AlumnoHome() {
                 CO₂ Evitado
               </span>
             </div>
-            <p className="display text-2xl text-primary font-bold">{eco.kgCo2Evitado} kg</p>
+            <p className="display text-2xl text-primary font-bold">
+              <AnimatedCounter value={eco.kgCo2Evitado} suffix=" kg" />
+            </p>
             <p className="text-[10px] text-muted-foreground">huella de carbono</p>
           </PaperCard>
 
@@ -163,7 +254,9 @@ function AlumnoHome() {
                 Energía Ahorrada
               </span>
             </div>
-            <p className="display text-2xl text-primary font-bold">{eco.kwhEnergiaAhorrada} kWh</p>
+            <p className="display text-2xl text-primary font-bold">
+              <AnimatedCounter value={eco.kwhEnergiaAhorrada} suffix=" kWh" />
+            </p>
             <p className="text-[10px] text-muted-foreground">red eléctrica</p>
           </PaperCard>
         </div>

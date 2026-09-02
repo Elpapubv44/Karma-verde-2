@@ -18,6 +18,9 @@ import type {
   MetaComunitariaEscolar,
   QuizPregunta,
   EcoMetricas,
+  SystemFlags,
+  Anuncio,
+  ScannedQrRecord,
 } from "./types";
 import {
   seedPremios,
@@ -30,6 +33,7 @@ import {
   seedCanjeTickets,
   seedEntregas,
   seedQuizPreguntas,
+  seedAnuncios,
 } from "./mock-data";
 import { api, usingMocks, ApiError, isOffline } from "./api";
 import { parseQr, yaUsado, marcarUsado } from "./qr";
@@ -52,13 +56,28 @@ export const ROL_LABEL: Record<Rol, string> = {
   asociado: "Asociado",
 };
 
-export function validarPasswordFuerte(pw: string): string | null {
-  if (pw.length < 10) return "La contraseña debe tener al menos 10 caracteres.";
-  if (!/[A-Z]/.test(pw)) return "Debe incluir al menos una mayúscula.";
-  if (!/[a-z]/.test(pw)) return "Debe incluir al menos una minúscula.";
-  if (!/[0-9]/.test(pw)) return "Debe incluir al menos un número.";
-  if (!/[^A-Za-z0-9]/.test(pw)) return "Debe incluir al menos un símbolo (!@#$...).";
-  return null;
+export interface PasswordValidationResult {
+  valida: boolean;
+  error: string | null;
+}
+
+export function validarPasswordFuerte(pw?: string | null): PasswordValidationResult {
+  if (!pw || pw.length < 10) {
+    return { valida: false, error: "La contraseña debe tener al menos 10 caracteres." };
+  }
+  if (!/[A-Z]/.test(pw)) {
+    return { valida: false, error: "Debe incluir al menos una mayúscula." };
+  }
+  if (!/[a-z]/.test(pw)) {
+    return { valida: false, error: "Debe incluir al menos una minúscula." };
+  }
+  if (!/[0-9]/.test(pw)) {
+    return { valida: false, error: "Debe incluir al menos un número." };
+  }
+  if (!/[^A-Za-z0-9]/.test(pw)) {
+    return { valida: false, error: "Debe incluir al menos un símbolo (!@#$...)." };
+  }
+  return { valida: true, error: null };
 }
 
 interface StoredUser extends User {
@@ -79,6 +98,9 @@ interface State {
   quizPreguntas: QuizPregunta[];
   quizzesCompletados: string[];
   privacidadNombres: boolean;
+  systemFlags: SystemFlags;
+  anuncios: Anuncio[];
+  historialQr: ScannedQrRecord[];
 }
 
 const KEY = "karmaverde-state-v4";
@@ -98,6 +120,14 @@ const initial: State = {
   quizPreguntas: seedQuizPreguntas,
   quizzesCompletados: [],
   privacidadNombres: false,
+  systemFlags: {
+    escaner: true,
+    canjes: true,
+    mapa: true,
+    registroAbierto: true,
+  },
+  anuncios: seedAnuncios,
+  historialQr: [],
 };
 
 let state: State = initial;
@@ -135,7 +165,10 @@ function load() {
       state = {
         ...initial,
         ...prev,
-        puntosVerdes: initial.puntosVerdes,
+        puntosVerdes:
+          prev.puntosVerdes && prev.puntosVerdes.length > 0
+            ? prev.puntosVerdes
+            : initial.puntosVerdes,
         users: prev.users && prev.users.length > 0 ? prev.users : initial.users,
         tareas: prev.tareas && prev.tareas.length > 0 ? prev.tareas : initial.tareas,
         tickets: prev.tickets && prev.tickets.length > 0 ? prev.tickets : initial.tickets,
@@ -149,6 +182,11 @@ function load() {
             ? prev.quizPreguntas
             : initial.quizPreguntas,
         quizzesCompletados: prev.quizzesCompletados ?? [],
+        systemFlags: prev.systemFlags
+          ? { ...initial.systemFlags, ...prev.systemFlags }
+          : initial.systemFlags,
+        anuncios: prev.anuncios && prev.anuncios.length > 0 ? prev.anuncios : initial.anuncios,
+        historialQr: prev.historialQr ?? [],
       };
     }
   } catch {
@@ -222,8 +260,8 @@ export interface RegisterInput {
 }
 
 export async function register(input: RegisterInput): Promise<{ ok: boolean; error?: string }> {
-  const pwErr = validarPasswordFuerte(input.password);
-  if (pwErr) return { ok: false, error: pwErr };
+  const pwCheck = validarPasswordFuerte(input.password);
+  if (!pwCheck.valida) return { ok: false, error: pwCheck.error ?? "Contraseña insegura." };
 
   if (input.rol === "creador" && input.codigo !== CREATOR_CODE) {
     return { ok: false, error: "Código de Creador inválido." };
@@ -761,4 +799,116 @@ export async function removeTarea(id: string) {
     }
   }
   setState((s) => ({ tareas: s.tareas.filter((t) => t.id !== id) }));
+}
+
+/* ————— System Flags (Persisted) ————— */
+export function setSystemFlags(flags: Partial<SystemFlags>) {
+  setState((s) => ({
+    systemFlags: { ...s.systemFlags, ...flags },
+  }));
+}
+export const actualizarSystemFlags = setSystemFlags;
+
+/* ————— Anuncios Globales y Escolares ————— */
+export function agregarAnuncio(anuncio: Omit<Anuncio, "id" | "fecha">) {
+  const nuevo: Anuncio = {
+    ...anuncio,
+    id: `an-${Date.now()}`,
+    fecha: new Date().toISOString().slice(0, 10),
+  };
+  setState((s) => ({
+    anuncios: [nuevo, ...s.anuncios],
+  }));
+}
+export const crearAnuncio = agregarAnuncio;
+
+export function eliminarAnuncio(id: string) {
+  setState((s) => ({
+    anuncios: s.anuncios.filter((a) => a.id !== id),
+  }));
+}
+
+/* ————— Historial de Escaneos QR ————— */
+export function agregarHistorialQr(item: Omit<ScannedQrRecord, "id">) {
+  const nuevo: ScannedQrRecord = {
+    ...item,
+    id: `scan-${Date.now()}`,
+  };
+  setState((s) => ({
+    historialQr: [nuevo, ...(s.historialQr || [])].slice(0, 50),
+  }));
+}
+
+/* ————— Perfil de Usuario Editable ————— */
+export function actualizarPerfil(datos: {
+  nombre?: string;
+  escuela?: string;
+  curso?: string;
+  avatar?: string;
+}) {
+  setState((s) => {
+    if (!s.user) return {};
+    const updatedUser = { ...s.user, ...datos };
+    const updatedUsers = s.users.map((u) => (u.id === s.user?.id ? { ...u, ...datos } : u));
+    return {
+      user: updatedUser,
+      users: updatedUsers,
+    };
+  });
+}
+
+export function cambiarPassword(antigua: string, nueva: string): { ok: boolean; error?: string } {
+  const validation = validarPasswordFuerte(nueva);
+  if (!validation.valida) return { ok: false, error: validation.error ?? "Contraseña insegura." };
+
+  let success = false;
+  setState((s) => {
+    if (!s.user) return {};
+    const target = s.users.find((u) => u.id === s.user?.id);
+    if (!target) return {};
+    if (target.password !== antigua) return {};
+    success = true;
+    return {
+      users: s.users.map((u) => (u.id === s.user?.id ? { ...u, password: nueva } : u)),
+    };
+  });
+
+  if (!success) {
+    return { ok: false, error: "La contraseña actual es incorrecta." };
+  }
+  return { ok: true };
+}
+
+/* ————— CRUD Puntos Verdes (Creador) ————— */
+export function upsertPuntoVerde(pv: PuntoVerde) {
+  setState((s) => {
+    const idx = s.puntosVerdes.findIndex((x) => x.id === pv.id);
+    return {
+      puntosVerdes:
+        idx >= 0 ? s.puntosVerdes.map((x, i) => (i === idx ? pv : x)) : [...s.puntosVerdes, pv],
+    };
+  });
+}
+
+export function removePuntoVerde(id: string) {
+  setState((s) => ({
+    puntosVerdes: s.puntosVerdes.filter((x) => x.id !== id),
+  }));
+}
+
+/* ————— CRUD Quizzes Educativos (Creador) ————— */
+export function upsertQuizPregunta(q: QuizPregunta) {
+  setState((s) => {
+    const idx = s.quizPreguntas.findIndex((x) => x.id === q.id);
+    return {
+      quizPreguntas:
+        idx >= 0 ? s.quizPreguntas.map((x, i) => (i === idx ? q : x)) : [...s.quizPreguntas, q],
+    };
+  });
+}
+
+export function removeQuizPregunta(id: string) {
+  setState((s) => ({
+    quizPreguntas: s.quizPreguntas.filter((x) => x.id !== id),
+  }));
 }

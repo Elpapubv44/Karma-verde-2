@@ -1,0 +1,21 @@
+{
+  "name": "Karmaverde — Reciclaje Escolar",
+  "short_name": "Karmaverde",
+  "description": "Economía circular y reciclaje sustentable para escuelas",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf8f2",
+  "theme_color": "#5a8a5c",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64 128x128 256x256 512x512",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

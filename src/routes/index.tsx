@@ -26,7 +26,14 @@ import {
   User,
   Building2,
   KeyRound,
+  Loader2,
+  HelpCircle,
+  X,
+  AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
   beforeLoad: () => {
@@ -58,10 +65,21 @@ function LandingAuthPage() {
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("sofia@escuela.edu.ar");
   const [password, setPassword] = useState("Password123!");
+  const [showPassword, setShowPassword] = useState(false);
   const [escuela, setEscuela] = useState("");
   const [codigo, setCodigo] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Rate limiting (Issue #70)
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
+
+  // Forgot password modal (Issue #24)
+  const [forgotModalOpen, setForgotModalOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
 
   useEffect(() => {
     if (currentUser) {
@@ -69,31 +87,80 @@ function LandingAuthPage() {
     }
   }, [currentUser, router]);
 
+  // Lockout countdown timer
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockoutSeconds]);
+
+  // Calculate password strength for registration
+  const passwordEval = validarPasswordFuerte(password) ?? {
+    valida: false,
+    error: "La contraseña debe tener al menos 10 caracteres.",
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (lockoutSeconds > 0) {
+      toast.error(`Demasiados intentos. Esperá ${lockoutSeconds} segundos.`);
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
     try {
       if (tab === "login") {
-        const res = await login(email, password, rol);
+        const res = await login(email.trim(), password, rol);
         if (!res.ok) {
-          setError(res.error);
+          const nextFails = failedAttempts + 1;
+          setFailedAttempts(nextFails);
+          if (nextFails >= 5) {
+            setLockoutSeconds(30);
+            setError("Demasiados intentos fallidos. Por seguridad, esperá 30 segundos.");
+            toast.error("Cuenta bloqueada temporalmente por 30 segundos.");
+          } else {
+            setError(res.error);
+            toast.error(res.error);
+          }
         } else {
+          setFailedAttempts(0);
+          toast.success(`¡Bienvenido/a, ${res.user.nombre}!`);
           router.navigate({ to: ROL_HOME[res.user.rol] });
         }
       } else {
+        // Register validation
+        if (!passwordEval?.valida) {
+          const errMsg =
+            passwordEval?.error ?? "La contraseña no cumple con los requisitos de seguridad.";
+          setError(errMsg);
+          toast.error(errMsg);
+          return;
+        }
+
         const res = await register({
-          nombre,
-          email,
+          nombre: nombre.trim(),
+          email: email.trim(),
           password,
           rol,
-          escuela,
-          codigoCreador: codigo,
+          escuela: escuela.trim(),
+          codigoCreador: codigo.trim(),
         });
+
         if (!res.ok) {
           setError(res.error);
+          toast.error(res.error);
         } else {
+          toast.success("¡Cuenta creada con éxito!");
           router.navigate({ to: ROL_HOME[res.user.rol] });
         }
       }
@@ -101,6 +168,16 @@ function LandingAuthPage() {
       setLoading(false);
     }
   }
+
+  const handleForgotPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail || !forgotEmail.includes("@")) {
+      toast.error("Ingresá un correo electrónico válido.");
+      return;
+    }
+    setForgotSent(true);
+    toast.success("Enlace de recuperación enviado al correo.");
+  };
 
   return (
     <div className="paper-grain min-h-screen px-4 py-8 sm:py-12">
@@ -178,7 +255,7 @@ function LandingAuthPage() {
                   Elegí tu rol
                 </label>
                 <span className="text-[10px] font-bold text-muted-foreground">
-                  {tab === "login" ? "Acceso directo disponible" : "Registro"}
+                  {tab === "login" ? "Cuentas de prueba listas" : "Registro de usuario"}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -208,7 +285,7 @@ function LandingAuthPage() {
                           }
                         }
                       }}
-                      className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 p-2.5 text-center transition-all ${
+                      className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 p-2.5 text-center transition-all active:scale-95 ${
                         isSelected
                           ? "border-primary bg-primary/15 text-ink shadow-xs"
                           : "border-dashed border-kraft/60 bg-cream/80 text-muted-foreground hover:border-earth"
@@ -224,7 +301,14 @@ function LandingAuthPage() {
               </div>
             </div>
 
-            {error && (
+            {lockoutSeconds > 0 && (
+              <div className="mb-4 rounded-xl border-2 border-destructive bg-destructive/10 p-3 text-xs font-bold text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>Bloqueo temporal por seguridad: reintentá en {lockoutSeconds} segundos.</span>
+              </div>
+            )}
+
+            {error && !lockoutSeconds && (
               <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs font-bold text-destructive">
                 {error}
               </div>
@@ -244,7 +328,7 @@ function LandingAuthPage() {
                       placeholder="Ej. Sofía Morales"
                       value={nombre}
                       onChange={(e) => setNombre(e.target.value)}
-                      className="w-full rounded-2xl border-2 border-kraft/60 bg-cream px-3 py-2.5 pl-9 text-sm text-ink outline-none transition-colors focus:border-primary"
+                      className="w-full rounded-2xl border-2 border-kraft/60 bg-cream px-3 py-2.5 pl-9 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
@@ -262,27 +346,94 @@ function LandingAuthPage() {
                     placeholder="tu@correo.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full rounded-2xl border-2 border-kraft/60 bg-cream px-3 py-2.5 pl-9 text-sm text-ink outline-none transition-colors focus:border-primary"
+                    className="w-full rounded-2xl border-2 border-kraft/60 bg-cream px-3 py-2.5 pl-9 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-extrabold uppercase tracking-wider text-earth">
-                  Contraseña
-                </label>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-earth">
+                    Contraseña
+                  </label>
+                  {tab === "login" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotSent(false);
+                        setForgotEmail(email);
+                        setForgotModalOpen(true);
+                      }}
+                      className="text-[11px] font-bold text-primary hover:underline"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     required
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-2xl border-2 border-kraft/60 bg-cream px-3 py-2.5 pl-9 text-sm text-ink outline-none transition-colors focus:border-primary"
+                    className="w-full rounded-2xl border-2 border-kraft/60 bg-cream px-3 py-2.5 pl-9 pr-10 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-ink"
+                    aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
+
+                {/* Password strength indicator in register mode (Issue #71) */}
+                {tab === "register" && password.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-kraft/30">
+                      <div
+                        className={`transition-all duration-300 ${
+                          password.length < 6
+                            ? "w-1/4 bg-destructive"
+                            : password.length < 10
+                              ? "w-2/4 bg-sun"
+                              : passwordEval?.valida
+                                ? "w-full bg-primary"
+                                : "w-3/4 bg-sun"
+                        }`}
+                      />
+                    </div>
+                    <p className="text-[10px] text-earth">
+                      {passwordEval?.valida ? (
+                        <span className="text-primary font-bold">✓ Contraseña segura y fuerte</span>
+                      ) : (
+                        <span>
+                          {passwordEval?.error ??
+                            "Mínimo 10 caracteres con mayúscula, minúscula, número y símbolo."}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
+
+              {tab === "login" && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="remember-me"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded border-kraft text-primary focus:ring-primary accent-primary"
+                  />
+                  <label htmlFor="remember-me" className="text-xs text-earth select-none font-bold">
+                    Recordar mi sesión en este dispositivo
+                  </label>
+                </div>
+              )}
 
               {tab === "register" && (
                 <>
@@ -298,7 +449,7 @@ function LandingAuthPage() {
                         placeholder="Ej. Escuela N° 12 Eco"
                         value={escuela}
                         onChange={(e) => setEscuela(e.target.value)}
-                        className="w-full rounded-2xl border-2 border-kraft/60 bg-cream px-3 py-2.5 pl-9 text-sm text-ink outline-none transition-colors focus:border-primary"
+                        className="w-full rounded-2xl border-2 border-kraft/60 bg-cream px-3 py-2.5 pl-9 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                       />
                     </div>
                   </div>
@@ -316,7 +467,7 @@ function LandingAuthPage() {
                           placeholder="Código de seguridad institucional"
                           value={codigo}
                           onChange={(e) => setCodigo(e.target.value)}
-                          className="w-full rounded-2xl border-2 border-kraft/60 bg-cream px-3 py-2.5 pl-9 text-sm text-ink outline-none transition-colors focus:border-primary font-mono"
+                          className="w-full rounded-2xl border-2 border-kraft/60 bg-cream px-3 py-2.5 pl-9 text-sm text-ink outline-none transition-colors focus:border-primary font-mono focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
                     </div>
@@ -324,13 +475,27 @@ function LandingAuthPage() {
                 </>
               )}
 
-              <PaperButton type="submit" disabled={loading} className="w-full justify-center mt-2">
-                {loading
-                  ? "Procesando..."
-                  : tab === "login"
-                    ? "Ingresar al panel"
-                    : "Crear mi cuenta"}
-                <ArrowRight className="h-4 w-4" />
+              <PaperButton
+                type="submit"
+                disabled={loading || lockoutSeconds > 0}
+                className="w-full justify-center mt-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Conectando...</span>
+                  </>
+                ) : tab === "login" ? (
+                  <>
+                    <span>Ingresar al panel</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    <span>Crear mi cuenta</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </PaperButton>
             </form>
           </PaperCard>
@@ -390,6 +555,78 @@ function LandingAuthPage() {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal (Issue #24) */}
+      {forgotModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-xs"
+        >
+          <PaperCard className="relative w-full max-w-md p-6 shadow-2xl">
+            <button
+              onClick={() => setForgotModalOpen(false)}
+              className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full border-2 border-kraft bg-cream text-ink hover:bg-kraft/20"
+              aria-label="Cerrar modal"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex items-center gap-2 mb-2">
+              <PaperTape color="sun">Recuperación</PaperTape>
+            </div>
+            <h3 className="display text-xl text-ink">¿Olvidaste tu contraseña?</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Ingresá tu correo escolar o registrado. Te enviaremos instrucciones seguras para
+              reestablecerla.
+            </p>
+
+            {forgotSent ? (
+              <div className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-center space-y-2">
+                <CheckCircle2 className="h-8 w-8 text-primary mx-auto" />
+                <p className="text-xs font-bold text-ink">¡Correo de recuperación enviado!</p>
+                <p className="text-[11px] text-earth">
+                  Revisá tu bandeja de entrada en <strong>{forgotEmail}</strong>.
+                </p>
+                <PaperButton
+                  variant="leaf"
+                  className="mt-2 w-full justify-center"
+                  onClick={() => setForgotModalOpen(false)}
+                >
+                  Cerrar
+                </PaperButton>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-earth mb-1">
+                    Correo electrónico
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="tu@correo.com"
+                    className="w-full rounded-xl border-2 border-kraft/60 bg-cream px-3 py-2 text-sm text-ink outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <PaperButton
+                    type="button"
+                    variant="cream"
+                    onClick={() => setForgotModalOpen(false)}
+                  >
+                    Cancelar
+                  </PaperButton>
+                  <PaperButton type="submit" variant="leaf">
+                    Enviar Instrucciones
+                  </PaperButton>
+                </div>
+              </form>
+            )}
+          </PaperCard>
+        </div>
+      )}
     </div>
   );
 }

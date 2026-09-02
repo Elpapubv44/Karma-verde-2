@@ -3,6 +3,8 @@ import { useState } from "react";
 import { PaperButton, PaperCard, PaperTape } from "@/components/paper/Paper";
 import { responderQuiz, useStore } from "@/lib/store";
 import EcoChat from "@/components/chat/EcoChat";
+import { triggerConfetti } from "@/components/ui/confetti";
+import { toast } from "sonner";
 import {
   Package,
   Layers,
@@ -16,6 +18,7 @@ import {
   XCircle,
   Sparkles,
   Award,
+  Clock,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/alumno/aprende")({
@@ -31,7 +34,7 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
   Orgánicos: Sprout,
 };
 
-function AprendePage() {
+export function AprendePage() {
   const guias = useStore((s) => s.guias);
   const quizPreguntas = useStore((s) => s.quizPreguntas);
   const quizzesCompletados = useStore((s) => s.quizzesCompletados);
@@ -48,6 +51,13 @@ function AprendePage() {
     setSelectedAnswers((prev) => ({ ...prev, [quizId]: optionIndex }));
     const res = responderQuiz(quizId, optionIndex);
     setQuizResults((prev) => ({ ...prev, [quizId]: res }));
+
+    if (res.esCorrecta) {
+      triggerConfetti();
+      toast.success(`¡Respuesta Correcta! Sumaste +${res.puntos} puntos`);
+    } else {
+      toast.error("Respuesta incorrecta. ¡Repasá la explicación técnica!");
+    }
   };
 
   return (
@@ -64,7 +74,7 @@ function AprendePage() {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-earth">
             <HelpCircle className="h-5 w-5 text-primary" />
-            <h2 className="display text-2xl text-ink">Eco-Trivia Escolar (+50 pts c/u)</h2>
+            <h2 className="display text-2xl text-ink">Eco-Trivia Escolar</h2>
           </div>
           <span className="rounded-full bg-sun/30 px-3 py-1 text-xs font-black text-ink">
             {quizzesCompletados.length} / {quizPreguntas.length} Completadas
@@ -83,9 +93,35 @@ function AprendePage() {
                 className="rounded-2xl border-2 border-dashed border-kraft/60 bg-cream p-4 space-y-3"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <p className="font-extrabold text-ink text-sm">
-                    {qIndex + 1}. {q.pregunta}
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      {q.dificultad && (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                            q.dificultad === "facil"
+                              ? "bg-primary/15 text-primary"
+                              : q.dificultad === "dificil"
+                                ? "bg-destructive/15 text-destructive"
+                                : "bg-sun text-ink"
+                          }`}
+                        >
+                          {q.dificultad === "facil"
+                            ? "Fácil"
+                            : q.dificultad === "dificil"
+                              ? "Avanzado"
+                              : "Intermedio"}
+                        </span>
+                      )}
+                      {isCompleted && (
+                        <span className="text-[10px] text-primary font-bold flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Completada
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-extrabold text-ink text-sm">
+                      {qIndex + 1}. {q.pregunta}
+                    </p>
+                  </div>
                   <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-0.5 text-[10px] font-black text-primary">
                     +{q.puntosPremio} pts
                   </span>
@@ -158,9 +194,16 @@ function AprendePage() {
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-extrabold text-ink">{g.titulo}</p>
-                    <PaperTape color="kraft" className="mt-1 text-[10px]">
-                      {g.categoria}
-                    </PaperTape>
+                    <div className="flex items-center gap-2 mt-1">
+                      <PaperTape color="kraft" className="text-[10px]">
+                        {g.categoria}
+                      </PaperTape>
+                      {g.tiempoLectura && (
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                          <Clock className="h-2.5 w-2.5" /> {g.tiempoLectura}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <span className="text-earth">
                     {isOpen ? (

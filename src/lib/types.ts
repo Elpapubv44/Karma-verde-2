@@ -80,6 +80,7 @@ export interface QuizPregunta {
   respuestaCorrecta: number;
   explicacion: string;
   puntosPremio: number;
+  dificultad?: "facil" | "medio" | "dificil";
 }
 
 export interface Guia {
@@ -97,6 +98,7 @@ export interface EtapaCircuito {
   descripcion: string;
   imagen?: string;
   video?: string;
+  galeria?: string[];
   estado: "activa" | "en_proceso" | "pendiente";
 }
 
@@ -104,6 +106,8 @@ export interface PuntoVerde {
   id: string;
   nombre: string;
   escuela: string;
+  direccion?: string;
+  horario?: string;
   lat: number;
   lng: number;
   materiales: string[];
@@ -126,4 +130,29 @@ export interface EcoMetricas {
   kgCo2Evitado: number;
   kwhEnergiaAhorrada: number;
   arbolesEquivalentes: number;
+}
+
+export interface SystemFlags {
+  escaner: boolean;
+  canjes: boolean;
+  mapa: boolean;
+  registroAbierto: boolean;
+}
+
+export interface Anuncio {
+  id: string;
+  titulo: string;
+  contenido: string;
+  autor: string;
+  fecha: string;
+  urgente?: boolean;
+}
+
+export interface ScannedQrRecord {
+  id: string;
+  codigo: string;
+  material: string;
+  puntos: number;
+  fecha: string;
+  hash: string;
 }

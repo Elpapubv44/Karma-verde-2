@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { PaperButton, PaperCard, PaperTape } from "@/components/paper/Paper";
-import { canjearQr, registrarEntregaManual, useStore } from "@/lib/store";
+import { canjearQr, registrarEntregaManual, agregarHistorialQr, useStore } from "@/lib/store";
 import { SmartQrModal } from "@/components/scanner/SmartQrModal";
+import { triggerConfetti } from "@/components/ui/confetti";
 import {
   ShieldCheck,
   Scale,
@@ -28,6 +29,7 @@ type Feedback =
 function EscanerPage() {
   const user = useStore((s) => s.user);
   const entregas = useStore((s) => s.entregas);
+  const systemFlags = useStore((s) => s.systemFlags);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -68,12 +70,26 @@ function EscanerPage() {
     // Si es un código de reciclaje válido de Karmaverde, lo procesa también
     if (
       raw.startsWith("KV|") ||
+      raw.startsWith("KV:") ||
       raw.includes("pet-") ||
       raw.includes("carton-") ||
       raw.includes("aluminio-")
     ) {
       const res = await canjearQr(raw);
       if (res.ok) {
+        if ("vibrate" in navigator) {
+          try {
+            navigator.vibrate(200);
+          } catch {
+            // vibration not permitted or supported
+          }
+        }
+        triggerConfetti();
+        agregarHistorialQr({
+          material: res.material,
+          puntos: res.puntos,
+          hash: res.hash,
+        });
         setFeedback({
           tipo: "ok",
           titulo: "¡Entrega Verificada!",
@@ -189,6 +205,16 @@ function EscanerPage() {
       </div>
 
       {/* Anti-Fraud Security Notice */}
+      {systemFlags && !systemFlags.allowQrScanning && (
+        <div className="flex items-center gap-2 rounded-2xl border-2 border-destructive bg-destructive/10 px-4 py-3 text-xs text-destructive font-black">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          <span>
+            El escaneo de códigos QR está pausado temporalmente por mantenimiento de la dirección
+            escolar.
+          </span>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-xs text-primary font-bold">
         <Lock className="h-4 w-4 shrink-0" />
         <span>
